@@ -10,9 +10,9 @@ using namespace std;
 
 template <typename T>
 class RLEMat {
-
+public:
     struct Encoded {
-        int count = 0;
+        ushort count = 0;
         T num = 0;
     };
 
@@ -47,17 +47,26 @@ public:
         int rowEnd = row + 1 == int(_rowStarts.size()) ? int(_encoded.size()) : _rowStarts.at(size_t(row + 1));
 
 
+        int lookupOperations = 0;
+
         int accumulator = 0;
         for (auto it = std::next(_encoded.begin(), rowStart);
              it != std::next(_encoded.begin(), rowEnd);
              ++it) {
+            ++lookupOperations;
             accumulator += it->count;
             if (accumulator > col) {
+                cout << "Lookup operations count:" << lookupOperations << endl;
                 return it->num;
             }
         }
         throw std::runtime_error("Indices (" + to_string(row) + ',' + to_string(col) + ") are out of range.");
     }
+
+    size_t size() const noexcept {
+        return _encoded.size();
+    }
+
 private:
     std::vector<Encoded> _encoded;
     std::vector<int> _rowStarts;
@@ -114,10 +123,30 @@ int main( int argc, char** argv)
     }
 
 
-
     std::transform(frames.begin(), frames.end(), std::back_inserter(rleFrames), [](const Mat& mat){
         return RLEMat<uchar>(mat);
     });
+
+
+    int totalEncodingsCount = 0;
+    for (auto && rleFrame : rleFrames) {
+        totalEncodingsCount += rleFrame.size();
+    }
+
+    int encodingByteSize = sizeof (RLEMat<uchar>::Encoded) / sizeof (int);
+    cout << "Size of encoded:" << encodingByteSize << endl;
+
+    int compressedMbSize = totalEncodingsCount * encodingByteSize / 1000000;
+    cout << "Size of RLE compressed frames:" << compressedMbSize << endl;
+
+    auto sampleFrame = frames[0];
+    cout << "Frame size:" << sampleFrame.size[0] << ' ' << sampleFrame.size[1] << endl;
+    int uncompressedMbSize = sampleFrame.size[0] * sampleFrame.size[1] * int(frames.size()) * 3 / 1000000;
+    cout << "Size of uncompressed frames:"
+         << uncompressedMbSize
+         << endl;
+
+    cout << "Compression Ratio: " << float(uncompressedMbSize) / float(compressedMbSize) << endl;
 
     setMouseCallback("image", onClick);
     createTrackbar( "frame", "image", &gCurrentFrame, int(frames.size() - 1));
